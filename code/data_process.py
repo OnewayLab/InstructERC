@@ -1,7 +1,7 @@
 import argparse
 import pickle
 import json
-import os 
+import os
 
 
 
@@ -39,7 +39,7 @@ def process_dataset(dataset, window=110, speaker_task='True', demons='False', pr
     content_task_dict = {}
     speaker_task_dict = {}
     sentence_dict = {}
-    data = pickle.load(open(f'YOUR_DATASET_COLLECTIONS_FOR_ERC_PATH/{dataset}/{dataset}.pkl','rb'))
+    data = pickle.load(open(f'../original_data/{dataset}/{dataset}.pkl','rb'))
 
     # 不同的数据集有不同的speaker_label的处理方式
     #Different datasets have different ways of handling speaker_label
@@ -63,7 +63,7 @@ def process_dataset(dataset, window=110, speaker_task='True', demons='False', pr
             for speaker_label in data[0][conv_id]:
                 temp_speaker_list.append(speaker_label.index(1))
             speaker_label_dict[conv_id] = temp_speaker_list
-    
+
     elif dataset == 'EmoryNLP':
         all_conv_id = data[3] + data[4] + data[5]
         sentence_dict = data[2]
@@ -123,14 +123,14 @@ def process_dataset(dataset, window=110, speaker_task='True', demons='False', pr
             new_train_id.append(f'{train_id}_{conv_turn}')
             if speaker_task == 'True' or speaker_task == 'True_mixed':
                 new_train_id.append(f'Speaker_{train_id}_{conv_turn}')
-            
-        
+
+
     for test_id in test_ids:
         for conv_turn in range(len(sentence_dict[test_id])):
             new_test_id.append(f'{test_id}_{conv_turn}')
             if speaker_task == 'True' or speaker_task == 'True_mixed':
                 new_test_id.append(f'Speaker_{test_id}_{conv_turn}')
-    
+
     for valid_id in valid_ids:
         for conv_turn in range(len(sentence_dict[valid_id])):
             new_valid_id.append(f'{valid_id}_{conv_turn}')
@@ -142,7 +142,7 @@ def process_dataset(dataset, window=110, speaker_task='True', demons='False', pr
     # dataset_list = ['train', 'test', 'valid']
     if predictions == 'False':
         if speaker_task == 'True_mixed':
-            data_path = f'YOUR_PROCESSED_DATASET_COLLECTIONS_FOR_ERC_PATH/{dataset}/speaker_window'
+            data_path = f'../processed_data/{dataset}/speaker_window'
             os.makedirs(data_path, exist_ok=True)
             with open(f'{data_path}/train.json', 'w') as f_train:
                 for train_id in new_train_id:
@@ -166,7 +166,7 @@ def process_dataset(dataset, window=110, speaker_task='True', demons='False', pr
                         f_valid.write(json.dumps({'input':f'{speaker_task_dict[valid_id]}','target':f'{speaker_target_dict[valid_id]}'}, ensure_ascii=False)+ '\n')
 
         elif speaker_task == 'True':
-            data_path_speaker = f'YOUR_PROCESSED_DATASET_COLLECTIONS_FOR_ERC_PATH{dataset}/speaker'
+            data_path_speaker = f'../processed_data/{dataset}/speaker'
             os.makedirs(data_path_speaker, exist_ok=True)
             with open(f'{data_path_speaker}/train.json', 'w') as f_train:
                 for train_id in new_train_id:
@@ -177,13 +177,13 @@ def process_dataset(dataset, window=110, speaker_task='True', demons='False', pr
                 for test_id in new_test_id:
                     if test_id in speaker_task_dict:
                         f_test.write(json.dumps({'input':f'{speaker_task_dict[test_id]}','target':f'{speaker_target_dict[test_id]}'}, ensure_ascii=False)+ '\n')
-            
+
             with open(f'{data_path_speaker}/valid.json', 'w') as f_valid:
                 for valid_id in new_valid_id:
                     if valid_id in speaker_task_dict:
                         f_valid.write(json.dumps({'input':f'{speaker_task_dict[valid_id]}','target':f'{speaker_target_dict[valid_id]}'}, ensure_ascii=False)+ '\n')
 
-            data_path_window = f'YOUR_PROCESSED_DATASET_COLLECTIONS_FOR_ERC_PATH/{dataset}/window'
+            data_path_window = f'../processed_data/{dataset}/window'
             os.makedirs(data_path_window, exist_ok=True)
             with open(f'{data_path_window}/train.json', 'w') as f_train:
                 for train_id in new_train_id:
@@ -201,11 +201,11 @@ def process_dataset(dataset, window=110, speaker_task='True', demons='False', pr
                     if valid_id in content_task_dict:
                         f_valid.write(json.dumps({'input':f'{content_task_dict[valid_id]}','target':f'{content_target_dict[valid_id]}'}, ensure_ascii=False)+ '\n')
 
-            data_path = data_path_speaker + "," +data_path_window         
-                        
+            data_path = data_path_speaker + "," +data_path_window
+
 
         elif speaker_task == 'None' and demons == 'False':
-            data_path = f'YOUR_PROCESSED_DATASET_COLLECTIONS_FOR_ERC_PATH/{dataset}/window'
+            data_path = f'../processed_data/{dataset}/window'
             os.makedirs(data_path, exist_ok=True)
 
             with open(f'{data_path}/train.json', 'w') as f_train:
@@ -219,11 +219,11 @@ def process_dataset(dataset, window=110, speaker_task='True', demons='False', pr
             with open(f'{data_path}/valid.json', 'w') as f_valid:
                 for valid_id in new_valid_id:
                     f_valid.write(json.dumps({'input':f'{content_task_dict[valid_id]}','target':f'{content_target_dict[valid_id]}'}, ensure_ascii=False)+ '\n')
-        
+
         elif speaker_task == 'None' and demons == 'True':
-            data_path = f'YOUR_PROCESSED_DATASET_COLLECTIONS_FOR_ERC_PATH/{dataset}/demon'
+            data_path = f'../processed_data/{dataset}/demon'
             os.makedirs(data_path, exist_ok=True)
-            
+
             with open(f'{data_path}/train.json', 'w') as f_train:
                 for train_id in new_train_id:
                     f_train.write(json.dumps({'input':f'{content_task_dict[train_id]}','target':f'{content_target_dict[train_id]}'}, ensure_ascii=False)+ '\n')
@@ -237,11 +237,11 @@ def process_dataset(dataset, window=110, speaker_task='True', demons='False', pr
                     f_valid.write(json.dumps({'input':f'{content_task_dict[valid_id]}','target':f'{content_target_dict[valid_id]}'}, ensure_ascii=False)+ '\n')
     elif predictions == 'True':
         if speaker_task == 'None' and demons == 'False':
-            data_path = f'/mnt/dolphinfs/hdd_pool/docker/user/hadoop-aipnlp/leishanglin/LLMs_for_ERC/data/{dataset}/predict/window'
+            data_path = f'../processed_data/{dataset}/predict/window'
         elif speaker_task == 'None' and demons == 'True':
-            data_path = f'/mnt/dolphinfs/hdd_pool/docker/user/hadoop-aipnlp/leishanglin/LLMs_for_ERC/data/{dataset}/predict/demon'
+            data_path = f'../processed_data/{dataset}/predict/demon'
         os.makedirs(data_path, exist_ok=True)
-            
+
         with open(f'{data_path}/train.json', 'w') as f_train:
             for train_id in new_train_id:
                 f_train.write(json.dumps({'input':f'{content_task_dict[train_id]}','target':f'{content_target_dict[train_id]}'}, ensure_ascii=False)+ '\n')

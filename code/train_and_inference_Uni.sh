@@ -1,5 +1,6 @@
-source YOUR CONDA ENVS
-source YOUR DOCKER
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+# source YOUR CONDA ENVS
+# source YOUR DOCKER
 
 
 # The Shellparameter that controls the mainprocess
@@ -10,7 +11,7 @@ FLAG=1
 # MODEL_NAME='ChatGLM'
 # MODEL_NAME='ChatGLM2'
 # MODEL_NAME='LLaMA'
-MODEL_NAME='LLaMA2'
+MODEL_NAME='LLaMA3'
 # MODEL_NAME='Bloom-560m'
 
 # select the experiment's model
@@ -28,7 +29,7 @@ dataset='EmoryNLP'
 
 # select the historical window for dataset
 # LLaMA 's context = 1024 is enough for almost dataset, except for iemocap.
-# IEMOCAP has very long conversation sample, 
+# IEMOCAP has very long conversation sample,
 # the historical window is designed for this kind of long conversation.
 historical_window=12
 
@@ -38,10 +39,10 @@ graphics_card=4
 BS=$((accumulations * graphics_card))
 
 # parameter that determines whether the speaker_identification task is add to train stage
-# meanwhile the speaker_identification loss is also added to the total loss 
+# meanwhile the speaker_identification loss is also added to the total loss
 # (actually another same next token prediction loss)
 # speaker_task has three options[True, True_mixed, None]
-# speaker_task='True' 
+# speaker_task='True'
 # speaker_task='True_mixed'
 speaker_task='None'
 echo "speaker_task: ${speaker_task}"
@@ -55,25 +56,25 @@ echo "domain_base: ${domain_base}"
 
 
 
-# parameter that determines whether the emotion_prediction task is added to train stage, 
+# parameter that determines whether the emotion_prediction task is added to train stage,
 # meanwhile the KL divergence is added to the total loss
-# emotion_prediction='True'
-emotion_prediction='False'
+emotion_prediction='True'
+# emotion_prediction='False'
 echo "emotion_prediction: ${emotion_prediction}"
 
-# data_percent=1.0    # 1
+data_percent=1.0    # 1
 # data_percent=0.5    # 1/2
 # data_percent=0.25   # 1/4
 # data_percent=0.125  # 1/8
-# data_percent=0.0625 # 1/16 
-# data_percent=0.03125 # 1/32 
-data_percent=0.015625 # 1/64 
+# data_percent=0.0625 # 1/16
+# data_percent=0.03125 # 1/32
+# data_percent=0.015625 # 1/64
 echo "data_percent: ${data_percent}"
 
 
 # Notes: bloom-560 is convenient for debugging
 case ${MODEL_NAME} in
-'ChatGLM'|'ChatGLM2'|'LLaMA'|'LLaMA2'|'Bloom-560m')
+'ChatGLM'|'ChatGLM2'|'LLaMA'|'LLaMA2'|'LLaMA3'|'Bloom-560m')
     case ${Experiments_setting} in
     'zero_shot'|'few_shot'|'lora'|'all_parameters')
         case ${dataset} in
@@ -103,7 +104,7 @@ case ${MODEL_NAME} in
     ;;
 esac
 
-# MAX_LENGTH=1200 
+# MAX_LENGTH=1200
 if [ ${FLAG} = 1 ]
 then
     DATA_PATH=$(python data_process.py --dataset ${dataset} \
@@ -120,7 +121,7 @@ then
         echo "Data procession script encountered an error."
     fi
 
-    if [ ${dataset} = 'iemocap' ]    
+    if [ ${dataset} = 'iemocap' ]
     then
         MAX_LENGTH=1200
     elif [ ${dataset} = 'meld' ]
@@ -148,10 +149,13 @@ then
         MODEL_PATH='LLaMA MODELPATH'
     elif [ ${MODEL_NAME} = 'LLaMA2' ]
     then
-        MODEL_PATH='LLaMA2 MODELPATH'
-    elif [ ${MODEL_NAME} = 'Bloom-560m' ]    
+        MODEL_PATH='meta-llama/Llama-2-7b-hf'
+    elif [ ${MODEL_NAME} = 'LLaMA3' ]
     then
-        MODEL_PATH='Bloom-560m MODELPATH'
+        MODEL_PATH='meta-llama/Meta-Llama-3.1-8b'
+    elif [ ${MODEL_NAME} = 'Bloom-560m' ]
+    then
+        MODEL_PATH='bigscience/bloom-560m'
     else
         echo -e "Your choose is not in MY candidations! Please check your Model name!"
     fi
@@ -196,7 +200,7 @@ then
 
 
     if [ ${emotion_prediction} = 'False' ]
-    then 
+    then
         if [ ${speaker_task} = 'True_mixed' ]
         then
             echo "Processed Data_Path: $DATA_PATH"
@@ -207,7 +211,7 @@ then
             --output_dir ./experiments/${MODEL_NAME}/${Experiments_setting}/${dataset}/${speaker_task} \
             --max_length ${MAX_LENGTH} \
             --batch_size ${BS} \
-            --deepspeed_config ./code/data_utils/deepspeed_config.json \
+            --deepspeed_config ./data_utils/deepspeed_config.json \
             --gradient_accumulation_steps ${accumulations} \
             --eval_batch_size 8 \
             --num_train_epochs 6 \
@@ -237,23 +241,23 @@ then
             echo "*********************************************"
             echo "Start to train on Speaker Identification task!"
             echo "*********************************************"
-            # deepspeed --master_port=29500 main_new.py \
-            # --dataset ${dataset} \
-            # --model_name_or_path ${MODEL_PATH} \
-            # --data_dir ${DATA_SPEAKER_PATH} \
-            # --output_dir ${Speaker_Model_output_dir} \
-            # --max_length ${MAX_LENGTH} \
-            # --batch_size ${BS} \
-            # --deepspeed_config ./code/data_utils/deepspeed_config.json \
-            # --gradient_accumulation_steps ${accumulations} \
-            # --eval_batch_size 8 \
-            # --num_train_epochs 3 \
-            # --save_steps 100000 \
-            # --lora ${LORA}\
-            # --learning_rate ${LR} \
-            # --do_train ${DO_TRAIN} \
-            # --do_eval ${DO_EVAL} \
-            # --statistic_mode False
+            deepspeed --master_port=29500 main_new.py \
+            --dataset ${dataset} \
+            --model_name_or_path ${MODEL_PATH} \
+            --data_dir ${DATA_SPEAKER_PATH} \
+            --output_dir ${Speaker_Model_output_dir} \
+            --max_length ${MAX_LENGTH} \
+            --batch_size ${BS} \
+            --deepspeed_config ./data_utils/deepspeed_config.json \
+            --gradient_accumulation_steps ${accumulations} \
+            --eval_batch_size 8 \
+            --num_train_epochs 3 \
+            --save_steps 100000 \
+            --lora ${LORA}\
+            --learning_rate ${LR} \
+            --do_train ${DO_TRAIN} \
+            --do_eval ${DO_EVAL} \
+            --statistic_mode False
             # --checkpoint_dir ${CHECKPOINT_DIR} \
             # --zero_shot ${ZERO_SHOT}
             echo "*******************************************************************"
@@ -270,7 +274,7 @@ then
             --output_dir ${Content_Model_output_dir} \
             --max_length ${MAX_LENGTH} \
             --batch_size ${BS} \
-            --deepspeed_config ./code/data_utils/deepspeed_config.json \
+            --deepspeed_config ./data_utils/deepspeed_config.json \
             --gradient_accumulation_steps ${accumulations} \
             --eval_batch_size 16 \
             --num_train_epochs 15 \
@@ -293,7 +297,7 @@ then
             --output_dir ./experiments/${MODEL_NAME}/${Experiments_setting}/${dataset}/demon \
             --max_length ${MAX_LENGTH} \
             --batch_size ${BS} \
-            --deepspeed_config ./code/data_utils/deepspeed_config.json \
+            --deepspeed_config ./data_utils/deepspeed_config.json \
             --gradient_accumulation_steps ${accumulations} \
             --eval_batch_size 8 \
             --num_train_epochs 8 \
@@ -302,7 +306,7 @@ then
             --learning_rate ${LR} \
             --do_eval ${DO_EVAL} \
             --do_train ${DO_TRAIN} \
-            --statistic_mode True 
+            --statistic_mode True
         elif [ ${speaker_task} = 'None' ] && [ ${domain_base} = 'False' ]
         then
             echo "Processed Data_Path: $DATA_PATH"
@@ -313,7 +317,7 @@ then
             --output_dir ./experiments/${MODEL_NAME}/${Experiments_setting}/${dataset}/window_${historical_window}/LR_${LR}_BS_${BS}_per_${data_percent} \
             --max_length ${MAX_LENGTH} \
             --batch_size ${BS} \
-            --deepspeed_config ./code/data_utils/deepspeed_config.json \
+            --deepspeed_config ./data_utils/deepspeed_config.json \
             --gradient_accumulation_steps ${accumulations} \
             --eval_batch_size 8 \
             --num_train_epochs 6 \
@@ -325,7 +329,7 @@ then
             --statistic_mode True \
             --data_percent ${data_percent} \
             # --gradient_checkpointing \
-            # --checkpoint_dir ./experiments/LLaMA2/lora/iemocap/True_one 
+            # --checkpoint_dir ./experiments/LLaMA2/lora/iemocap/True_one
         fi
     elif [ ${emotion_prediction} = 'True' ]
     then
@@ -343,7 +347,7 @@ then
             --output_dir ./experiments/${MODEL_NAME}/${Experiments_setting}/${dataset}/Predict/speaker/window_${historical_window} \
             --max_length ${MAX_LENGTH} \
             --batch_size ${BS} \
-            --deepspeed_config ./code/data_utils/deepspeed_config.json \
+            --deepspeed_config ./data_utils/deepspeed_config.json \
             --gradient_accumulation_steps ${accumulations} \
             --eval_batch_size 8 \
             --num_train_epochs 15 \
@@ -356,7 +360,7 @@ then
             --beta 0.1 \
             --theta 1.0 \
             --emotion_prediction True \
-            --checkpoint_dir ./experiments/LLaMA2/lora/${dataset}/True_one 
+            --checkpoint_dir ./experiments/LLaMA2/lora/${dataset}/True_one
 
-    fi  
+    fi
 fi

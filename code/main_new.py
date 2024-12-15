@@ -8,29 +8,18 @@ from transformers import (
     LlamaForCausalLM,
     LlamaConfig,
     LlamaTokenizer,
-    get_linear_schedule_with_warmup,
-    StoppingCriteriaList
+    get_linear_schedule_with_warmup
 )
-import pdb
-import torch.nn.functional as F
 import torch
-import torch.nn as nn
 import deepspeed
-from dataclasses import dataclass, asdict
-import pandas as pd
 import json
-import logging
 import math
 import os
 import random
-import re
-import warnings
-from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
+from torch.utils.data import DataLoader, SequentialSampler
 import numpy as np
 from data_utils.data_utils import *
 from deepspeed.ops.adam import DeepSpeedCPUAdam, FusedAdam
-from torch.optim import AdamW, Adam
-from typing import List, Dict
 from peft import LoraConfig, get_peft_model
 import argparse
 from deepspeed.utils.zero_to_fp32 import load_state_dict_from_zero_checkpoint
@@ -88,8 +77,8 @@ def report_score(dataset, golds, preds, mode='test'):
     # for i in range(len(target_names)):
     #     res['matrix'][-1].append("{}: {:.4f}".format(target_names[i], accuracy_score(golds[golds == i], preds[golds == i])))
 
-    return res, res_matrix     
-    
+    return res, res_matrix
+
 def match_text(text, word_set_):
     if text is None:
         return []
@@ -223,7 +212,7 @@ parser.add_argument(
     help="The ratio of warmup.",
 )
 parser.add_argument(
-    '--local_rank', 
+    '--local_rank',
     default=-1
 )
 parser.add_argument(
@@ -390,7 +379,7 @@ if args.do_train == 'True':
 else:
     args.do_train = False
 
-if args.do_eval == 'True': 
+if args.do_eval == 'True':
     args.do_eval = True
 else:
     args.do_eval = False
@@ -502,7 +491,7 @@ def getOptimizerGroup(model):
             0.0,
         },
     ]
-    
+
     return optimizer_grouped_parameters
 
 def _get_pred_input_dict(batch):
@@ -513,30 +502,30 @@ def _get_pred_input_dict(batch):
     batch['type_token_ids'] = batch['type_token_ids'].unsqueeze(1)
     input_ids, labels, attention_mask, type_token_ids = batch["input_ids"][0], \
         batch["labels"][0], batch["attention_mask"][0], batch["type_token_ids"][0]
-    
+
     pred_input_ids, pred_labels, pred_attention_mask, pred_type_token_ids = batch["input_ids"][1], \
         batch["labels"][1], batch["attention_mask"][1], batch["type_token_ids"][1]
-     
-    
+
+
     return {
         "input_ids": input_ids.to(device),
         "labels": labels.to(device),
-        "attention_mask": attention_mask.to(device) 
+        "attention_mask": attention_mask.to(device)
     },{
         "input_ids": pred_input_ids.to(device),
         "labels": pred_labels.to(device),
-        "attention_mask": pred_attention_mask.to(device) 
+        "attention_mask": pred_attention_mask.to(device)
     }
 
 def _get_input_dict(batch):
     input_ids, labels, attention_mask, type_token_ids = batch["input_ids"], \
         batch["labels"], batch["attention_mask"], batch["type_token_ids"]
-    
+
     return {
         "input_ids": input_ids.to(device),
         "labels": labels.to(device),
         "attention_mask": attention_mask.to(device)
-        
+
     }
 
 ## prepare model
@@ -654,7 +643,7 @@ if args.do_train:
         config=deepspeed_config,
         collate_fn=train_collator
     )
-    model = model_engine    
+    model = model_engine
     should_save = True
 elif args.do_eval:
     if not args.zero_shot:
@@ -701,11 +690,11 @@ if __name__ == "__main__":
                     # kl_loss = F.kl_div(res.softmax(dim=-1).log(), pre.softmax(dim=-1), reduction='sum')
                     # kl_loss = F.kl_div(F.log_softmax(res, dim=-1), F.softmax(pre, dim=-1), reduction='sum')
                     # print(outputs.loss.shape, kl_loss.shape)
-                    
+
                     # loss = outputs.loss + args.theta*kl_loss
                     loss = outputs.loss
-                    
-                    
+
+
                 else:
                     batch = _get_input_dict(batch)
                     outputs = model(**batch)
@@ -714,7 +703,7 @@ if __name__ == "__main__":
                 model.backward(loss)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_norm)
                 model.step()
-                    
+
                 current_loss = loss.item()
                 batch_iterator.set_description(
                     f"Epochs {epoch}/{args.num_train_epochs}. Running Loss: {current_loss:9.4f}"
@@ -728,7 +717,7 @@ if __name__ == "__main__":
                     should_save = False
 
                 # model starts to evaluation
-            
+
             model.eval()
             targets = list(df_dev["output"])
             eval_sampler = SequentialSampler(dev_dataset)
@@ -792,7 +781,7 @@ if __name__ == "__main__":
                 this_eval_instance = {
                     "index": index,
                     "input": this_input,
-                    "output": answer, 
+                    "output": answer,
                     "target": targets[index],
                 }
                 preds_for_eval.append(this_eval_instance)
@@ -811,7 +800,7 @@ if __name__ == "__main__":
                         preds += [emotional_label_dict[optimize_output(answer, list(emotional_label_dict.keys()))]]
                         # preds += [confuse_index]
                         confuse_case += [index]
-                
+
                 if len(preds) == len(all_answers):
                     score, res_matrix = report_score(dataset=args.dataset, golds=golds, preds=preds)
 
@@ -841,7 +830,7 @@ if __name__ == "__main__":
                     f.write(json.dumps(deepspeed_config, indent=5))
 
 
-            
+
 
     if not args.do_train and args.do_eval:
         # model starts to evaluation
@@ -908,7 +897,7 @@ if __name__ == "__main__":
             this_eval_instance = {
                 "index": index,
                 "input": this_input,
-                "output": answer, 
+                "output": answer,
                 "target": targets[index],
             }
             preds_for_eval.append(this_eval_instance)
@@ -927,13 +916,13 @@ if __name__ == "__main__":
                 # preds += [confuse_index]
                 preds += [emotional_label_dict[optimize_output(answer, list(emotional_label_dict.keys()))]]
                 confuse_case += [index]
-        
+
         if len(preds) == len(all_answers):
             score, res_matrix = report_score(dataset=args.dataset, golds=golds, preds=preds)
             eval_score_list.append(score)
 
         # statisics of model's output
-    
+
         with open(preds_for_eval_path, 'w', encoding='utf-8') as f:
             f.write(json.dumps(score))
             f.write(f'\n{res_matrix}')
