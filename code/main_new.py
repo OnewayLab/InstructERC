@@ -556,13 +556,14 @@ else:
         ## for llama, vicuna, belle
         config = LlamaConfig.from_pretrained(args.model_name_or_path)
         tokenizer = LlamaTokenizer.from_pretrained(args.model_name_or_path)
-        model = LlamaForCausalLM.from_pretrained(args.model_name_or_path).half()
+        # model = LlamaForCausalLM.from_pretrained(args.model_name_or_path).half()
+        model = LlamaForCausalLM.from_pretrained(args.model_name_or_path, device_map="auto").half()
         # if args.dataset == 'EmoryNLP':
         #     deepspeed_config["bfloat16"]["enabled"] = True
         #     deepspeed_config["fp16"]["enabled"] = False
         # else:
-        deepspeed_config["bfloat16"]["enabled"] = False
-        deepspeed_config["fp16"]["enabled"] = True
+        # deepspeed_config["bfloat16"]["enabled"] = False
+        # deepspeed_config["fp16"]["enabled"] = True
 
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.unk_token

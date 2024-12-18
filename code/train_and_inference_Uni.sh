@@ -1,4 +1,12 @@
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+set -e
+set -o pipefail
+
+export HF_ENDPOINT=https://hf-mirror.com
+export HF_HOME=/nas-wulanchabu/hongzhan.chz/tmp/HuggingFace
+export HF_TOKEN=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
+export CUDA_VISIBLE_DEVICES=0
+export WANDB_DISABLED=True
+
 # source YOUR CONDA ENVS
 # source YOUR DOCKER
 
@@ -11,7 +19,7 @@ FLAG=1
 # MODEL_NAME='ChatGLM'
 # MODEL_NAME='ChatGLM2'
 # MODEL_NAME='LLaMA'
-MODEL_NAME='LLaMA3'
+MODEL_NAME='LLaMA2'
 # MODEL_NAME='Bloom-560m'
 
 # select the experiment's model
@@ -24,8 +32,8 @@ Experiments_setting='lora'
 # select the dataset
 # dataset='test'
 # dataset='iemocap'
-# dataset='meld'
-dataset='EmoryNLP'
+dataset='meld'
+# dataset='EmoryNLP'
 
 # select the historical window for dataset
 # LLaMA 's context = 1024 is enough for almost dataset, except for iemocap.
@@ -35,8 +43,10 @@ historical_window=12
 
 # set the accumulation and card when backwarding and inferring
 accumulations=8
-graphics_card=4
-BS=$((accumulations * graphics_card))
+micro_batch_size=4
+BS=$((accumulations * micro_batch_size))
+
+EPOCHS=6
 
 # parameter that determines whether the speaker_identification task is add to train stage
 # meanwhile the speaker_identification loss is also added to the total loss
@@ -58,8 +68,8 @@ echo "domain_base: ${domain_base}"
 
 # parameter that determines whether the emotion_prediction task is added to train stage,
 # meanwhile the KL divergence is added to the total loss
-emotion_prediction='True'
-# emotion_prediction='False'
+# emotion_prediction='True'
+emotion_prediction='False'
 echo "emotion_prediction: ${emotion_prediction}"
 
 data_percent=1.0    # 1
@@ -149,7 +159,7 @@ then
         MODEL_PATH='LLaMA MODELPATH'
     elif [ ${MODEL_NAME} = 'LLaMA2' ]
     then
-        MODEL_PATH='meta-llama/Llama-2-7b-hf'
+        MODEL_PATH='/nas-wulanchabu/hongzhan.chz/tmp/models/meta-llama/Llama-2-7b-hf'
     elif [ ${MODEL_NAME} = 'LLaMA3' ]
     then
         MODEL_PATH='meta-llama/Meta-Llama-3.1-8b'
@@ -241,24 +251,24 @@ then
             echo "*********************************************"
             echo "Start to train on Speaker Identification task!"
             echo "*********************************************"
-            deepspeed --master_port=29500 main_new.py \
-            --dataset ${dataset} \
-            --model_name_or_path ${MODEL_PATH} \
-            --data_dir ${DATA_SPEAKER_PATH} \
-            --output_dir ${Speaker_Model_output_dir} \
-            --max_length ${MAX_LENGTH} \
-            --batch_size ${BS} \
-            --deepspeed_config ./data_utils/deepspeed_config.json \
-            --gradient_accumulation_steps ${accumulations} \
-            --eval_batch_size 8 \
-            --num_train_epochs 3 \
-            --save_steps 100000 \
-            --lora ${LORA}\
-            --learning_rate ${LR} \
-            --do_train ${DO_TRAIN} \
-            --do_eval ${DO_EVAL} \
-            --statistic_mode False
-            # --checkpoint_dir ${CHECKPOINT_DIR} \
+            # deepspeed --master_port=29500 main_new.py \
+            # --dataset ${dataset} \
+            # --model_name_or_path ${MODEL_PATH} \
+            # --data_dir ${DATA_SPEAKER_PATH} \
+            # --output_dir ${Speaker_Model_output_dir} \
+            # --max_length ${MAX_LENGTH} \
+            # --batch_size ${BS} \
+            # --deepspeed_config ./data_utils/deepspeed_config.json \
+            # --gradient_accumulation_steps ${accumulations} \
+            # --eval_batch_size 8 \
+            # --num_train_epochs 3 \
+            # --save_steps 100000 \
+            # --lora ${LORA}\
+            # --learning_rate ${LR} \
+            # --do_train ${DO_TRAIN} \
+            # --do_eval ${DO_EVAL} \
+            # --statistic_mode False
+            # --checkpoint_dir ${`CHECKPOINT_DIR`} \
             # --zero_shot ${ZERO_SHOT}
             echo "*******************************************************************"
             echo "Speaker Identification task has been achieved successfully!"
@@ -277,7 +287,7 @@ then
             --deepspeed_config ./data_utils/deepspeed_config.json \
             --gradient_accumulation_steps ${accumulations} \
             --eval_batch_size 16 \
-            --num_train_epochs 15 \
+            --num_train_epochs $EPOCHS \
             --save_steps 100000 \
             --lora ${LORA}\
             --learning_rate ${LR} \
@@ -300,7 +310,7 @@ then
             --deepspeed_config ./data_utils/deepspeed_config.json \
             --gradient_accumulation_steps ${accumulations} \
             --eval_batch_size 8 \
-            --num_train_epochs 8 \
+            --num_train_epochs $EPOCHS \
             --save_steps 100000 \
             --lora ${LORA}\
             --learning_rate ${LR} \
@@ -314,13 +324,13 @@ then
             --dataset ${dataset} \
             --model_name_or_path ${MODEL_PATH} \
             --data_dir ${DATA_PATH} \
-            --output_dir ./experiments/${MODEL_NAME}/${Experiments_setting}/${dataset}/window_${historical_window}/LR_${LR}_BS_${BS}_per_${data_percent} \
+            --output_dir ./experiments/${MODEL_NAME}/${Experiments_setting}/${dataset}/window_${historical_window}/LR_${LR}_BS_${BS}_per_${data_percent}_epochs_${EPOCHS} \
             --max_length ${MAX_LENGTH} \
             --batch_size ${BS} \
             --deepspeed_config ./data_utils/deepspeed_config.json \
             --gradient_accumulation_steps ${accumulations} \
             --eval_batch_size 8 \
-            --num_train_epochs 6 \
+            --num_train_epochs $EPOCHS \
             --save_steps 100000 \
             --lora ${LORA}\
             --learning_rate ${LR} \
@@ -344,13 +354,13 @@ then
             --dataset ${dataset} \
             --model_name_or_path ${MODEL_PATH} \
             --data_dir ${DATA_PATH} \
-            --output_dir ./experiments/${MODEL_NAME}/${Experiments_setting}/${dataset}/Predict/speaker/window_${historical_window} \
+            --output_dir ./experiments/${MODEL_NAME}/${Experiments_setting}/${dataset}/True_one_Predict/speaker/window_${historical_window}/LR_${LR}_BS_${BS}_per_${data_percent}_epochs_${EPOCHS} \
             --max_length ${MAX_LENGTH} \
             --batch_size ${BS} \
             --deepspeed_config ./data_utils/deepspeed_config.json \
             --gradient_accumulation_steps ${accumulations} \
             --eval_batch_size 8 \
-            --num_train_epochs 15 \
+            --num_train_epochs $EPOCHS \
             --save_steps 100000 \
             --lora ${LORA}\
             --learning_rate ${LR} \
