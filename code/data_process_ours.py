@@ -12,6 +12,12 @@ EMOTIONAL_LABEL_TEXTS = {
     dataset: ", ".join([f'"{e}"' for e in emotions])
     for dataset, emotions in EMOTIONAL_LABELS.items()
 }
+LABEL_CLASS = {
+    "positive": ["happy", "excited", "surprise", "joyful", "Joyful", "Powerful"],
+    "neutral": ["neutral", "Peaceful", "Neutral"],
+    "negative": ["sad", "angry", "frustrated", "fear", "disgust", "angry", "Mad", "Sad", "Scared"],
+}
+LABEL_CLASS = {f: coarse for coarse, fine in LABEL_CLASS.items() for f in fine}
 
 INPUT_TEMPLATE = """\
 You are an expert of sentiment and emotional analysis. Your task is to analyze the emotion of the last turn of a conversation.
@@ -29,34 +35,37 @@ TASK_STATEMENTS = {
         "meld": """There are two levels of emotional categories. The coarse-grained categories include: "positive", "neutral" and "negative". Each coarse-grained category contains several fine-grained categories. Positive emotions include "surprise" and "joyful". Negative emotions include "fear", "sad", "disgust" and "angry".\n""",
         "EmoryNLP": """There are two levels of emotional categories. The coarse-grained categories include: "Positive", "Neutral" and "Negative". Each coarse-grained category contains several fine-grained categories. Positive emotions include "Joyful" and "Powerful". Neutral emotions include "Neutral" and "Peaceful". Negative emotions include "Mad", "Sad" and "Scared".\n""",
     },
+    "coe": {
+        dataset: f"""There are {len(EMOTIONAL_LABELS[dataset])} emotional labels: f{emotion_text}.\n"""
+        for dataset, emotion_text in EMOTIONAL_LABEL_TEXTS.items()
+    },
     "none": {
         dataset: f"""There are {len(EMOTIONAL_LABELS[dataset])} emotional labels: f{emotion_text}.\n"""
         for dataset, emotion_text in EMOTIONAL_LABEL_TEXTS.items()
     },
 }
 INSTRUCTION = {
-    "2-grain": """Analyze the emotion for <Speaker_{speaker}: {utterance}> in the above conversation. The first line of your output must be one of "positive", "neutral" or "negative", and the second line must be a fine-grained emotional category chosen from {emotions}.""",
-    "none": "Please select the emotional label of <Speaker_{speaker}: {utterance}> from {emotions}.",
+    "2-grain": """Analyze the emotion for <Turn_{turn}(Speaker_{speaker}): {utterance}> in the above conversation. The first line of your output must be one of "positive", "neutral" or "negative", and the second line must be a fine-grained emotional category chosen from {emotions}.""",
+    "coe": """Let's analyze the emotion for each tuen in the conversation and finally determine the emotional label of the last tuen.""",
+    "none": "Please select the emotional label of <Turn_{turn}(Speaker_{speaker}): {utterance}> from {emotions}.",
 }
-OUTPUT_TEMPLATE = {"2-grain": "{coarse_emotion}\n{fine_emotion}", "none": "{fine_emotion}"}
 
+def format_output(cot_type, speakers, emotions):
+    if cot_type == "none":
+        return emotions[-1]
+    elif cot_type == "2-grain":
+        return f"{LABEL_CLASS[emotions[-1]]}\n{emotions[-1]}"
+    elif cot_type == "coe":
+        output = ""
+        for i, (speaker, emotion) in enumerate(zip(speakers, emotions)):
+            output += f"Turn_{i}(Speaker_{speaker}): {emotion}\n"
+        return output
 
 def process_dataset(dataset, window=110, cot_type="none", bio=True):
     """
     `cot_type` can be "none", "2-grain"
     `bio` can be True or False
     """
-    label_set = {
-        "iemocap": ["happy", "sad", "neutral", "angry", "excited", "frustrated"],
-        "meld": ["neutral", "surprise", "fear", "sad", "joyful", "disgust", "angry"],
-        "EmoryNLP": ["Joyful", "Mad", "Peaceful", "Neutral", "Sad", "Powerful", "Scared"],
-    }
-    label_class = {
-        "positive": ["happy", "excited", "surprise", "joyful", "Joyful", "Powerful"],
-        "neutral": ["neutral", "Peaceful", "Neutral"],
-        "negative": ["sad", "angry", "frustrated", "fear", "disgust", "angry", "Mad", "Sad", "Scared"],
-    }
-    label_class = {f: coarse for coarse, fine in label_class.items() for f in fine}
     speaker_label_dict = {}
     content_target_dict = {}
     content_task_dict = {}
@@ -98,22 +107,19 @@ def process_dataset(dataset, window=110, cot_type="none", bio=True):
         for conv_turn in range(len(sentence_dict[conv_id])):
             conversation_str = ""
             index_w = max(conv_turn - window, 0)
-            for speaker_label, sub_sent in zip(
-                speaker_label_dict[conv_id][index_w : conv_turn + 1], sentence_dict[conv_id][index_w : conv_turn + 1]
-            ):
-                conversation_str += f'Speaker_{speaker_label}: "{sub_sent}"\n'
+            speakers = speaker_label_dict[conv_id][index_w : conv_turn + 1]
+            sentences = sentence_dict[conv_id][index_w : conv_turn + 1]
+            emotions = [EMOTIONAL_LABELS[dataset][emo_id] for emo_id in data[1][conv_id][index_w : conv_turn + 1]]
+            for i, (speaker_label, sub_sent) in enumerate(zip(speakers, sentences)):
+                conversation_str += f'Turn_{i+1}(Speaker_{speaker_label}): {sub_sent}\n'
             task_statement = TASK_STATEMENTS[cot_type][dataset]
             instruction = INSTRUCTION[cot_type].format(
-                speaker=speaker_label_dict[conv_id][conv_turn], utterance=sentence_dict[conv_id][conv_turn], emotions=EMOTIONAL_LABEL_TEXTS[dataset]
+                speaker=speakers[-1], utterance=sentences[-1], emotions=EMOTIONAL_LABEL_TEXTS[dataset], turn=i+1
             )
             content_task_dict[f"{conv_id}_{conv_turn}"] = INPUT_TEMPLATE.format(
                 task_statement=task_statement, conversation=conversation_str, biography="", instruction=instruction
             )
-            fine_emotion = label_set[dataset][data[1][conv_id][conv_turn]]
-            coarse_emotion = label_class[fine_emotion]
-            content_target_dict[f"{conv_id}_{conv_turn}"] = OUTPUT_TEMPLATE[cot_type].format(
-                coarse_emotion=coarse_emotion, fine_emotion=fine_emotion
-            )
+            content_target_dict[f"{conv_id}_{conv_turn}"] = format_output(cot_type, speakers, emotions)
 
     if dataset == "iemocap":
         train_ids, test_ids, valid_ids = data[3], data[4], data[5]
@@ -168,6 +174,12 @@ def process_dataset(dataset, window=110, cot_type="none", bio=True):
                 )
                 + "\n"
             )
+
+    with open(f"../processed_data/dataset_info.json", "r", encoding="utf-8") as f:
+        dataset_info = json.load(f)
+    dataset_info[f"{dataset}_{cot_type}_bio{bio}_train"] = f"{data_path}/train.json"
+    dataset_info[f"{dataset}_{cot_type}_bio{bio}_valid"] = f"{data_path}/valid.json"
+    dataset_info[f"{dataset}_{cot_type}_bio{bio}_test"] = f"{data_path}/test.json"
 
     return data_path
 

@@ -10,7 +10,7 @@ export HF_TOKEN=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
 export CUDA_VISIBLE_DEVICES=0
 export WANDB_DISABLED=True
 
-VERSION=0.2
+VERSION=0.4
 
 # select basemodel
 # MODEL_PATH=bigscience/bloom-560m
@@ -51,8 +51,9 @@ BS=$((accumulations * micro_batch_size))
 
 EPOCHS=6
 
-COT_TYPE=none
-# COT_TYPE=2-grain
+# COT_TYPE=none
+COT_TYPE=2-grain
+# COT_TYPE=coe
 
 BIO=False
 

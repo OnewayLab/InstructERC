@@ -598,6 +598,7 @@ if __name__ == "__main__":
                 confuse_case = []
                 for index, answer in enumerate(all_answers):
                     golds += [emotional_label_dict[targets[index].split("\n")[-1]]]  # 真实标签（数字）
+                    answer = answer.strip().split("\n")[-1]
                     match_res = match_text(answer, list(emotional_label_dict.keys()))
                     if match_res:
                         preds += [emotional_label_dict[match_res[0]]]
