@@ -32,8 +32,8 @@ Experiments_setting='lora'
 # select the dataset
 # dataset='test'
 # dataset='iemocap'
-dataset='meld'
-# dataset='EmoryNLP'
+# dataset='meld'
+dataset='EmoryNLP'
 
 # select the historical window for dataset
 # LLaMA 's context = 1024 is enough for almost dataset, except for iemocap.

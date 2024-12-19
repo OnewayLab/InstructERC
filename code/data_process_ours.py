@@ -3,8 +3,18 @@ import pickle
 import json
 import os
 
+EMOTIONAL_LABELS = {
+    "iemocap": ["happy", "sad", "neutral", "angry", "excited", "frustrated"],
+    "meld": ["neutral", "surprise", "fear", "sad", "joyful", "disgust", "angry"],
+    "EmoryNLP": ["Joyful", "Mad", "Peaceful", "Neutral", "Sad", "Powerful", "Scared"],
+}
+EMOTIONAL_LABEL_TEXTS = {
+    dataset: ", ".join([f'"{e}"' for e in emotions])
+    for dataset, emotions in EMOTIONAL_LABELS.items()
+}
+
 INPUT_TEMPLATE = """\
-You are an expert of sentiment and emotional analysis.
+You are an expert of sentiment and emotional analysis. Your task is to analyze the emotion of the last turn of a conversation.
 {task_statement}\
 What follows is a conversation involving several speakers.
 <BEGIN OF THE CONVERSATION>
@@ -20,14 +30,13 @@ TASK_STATEMENTS = {
         "EmoryNLP": """There are two levels of emotional categories. The coarse-grained categories include: "Positive", "Neutral" and "Negative". Each coarse-grained category contains several fine-grained categories. Positive emotions include "Joyful" and "Powerful". Neutral emotions include "Neutral" and "Peaceful". Negative emotions include "Mad", "Sad" and "Scared".\n""",
     },
     "none": {
-        "iemocap": """There are six emotional labels: "happy", "excited", "neutral", "sad", "angry" and "frustrated".\n""",
-        "meld": """There are seven emotional labels: "surprise", "joyful", "neutral", "fear", "sad", "disgust" and "angry".\n""",
-        "EmoryNLP": """There are seven emotional labels: "Joyful", "Powerful", "Neutral", "Peaceful", "Mad", "Sad" and "Scared".\n""",
+        dataset: f"""There are {len(EMOTIONAL_LABELS[dataset])} emotional labels: f{emotion_text}.\n"""
+        for dataset, emotion_text in EMOTIONAL_LABEL_TEXTS.items()
     },
 }
 INSTRUCTION = {
-    "2-grain": """Analyze the emotion for <Speaker_{speaker}: {utterance}> in the above conversation. The first line of your output must be one of "positive", "neutral" or "negative", and the second line must be one of the fine-grained emotional categories.""",
-    "none": "Please select the emotional label of <Speaker_{speaker}: {utterance}> in the above conversation.",
+    "2-grain": """Analyze the emotion for <Speaker_{speaker}: {utterance}> in the above conversation. The first line of your output must be one of "positive", "neutral" or "negative", and the second line must be a fine-grained emotional category chosen from {emotions}.""",
+    "none": "Please select the emotional label of <Speaker_{speaker}: {utterance}> from {emotions}.",
 }
 OUTPUT_TEMPLATE = {"2-grain": "{coarse_emotion}\n{fine_emotion}", "none": "{fine_emotion}"}
 
@@ -95,7 +104,7 @@ def process_dataset(dataset, window=110, cot_type="none", bio=True):
                 conversation_str += f'Speaker_{speaker_label}: "{sub_sent}"\n'
             task_statement = TASK_STATEMENTS[cot_type][dataset]
             instruction = INSTRUCTION[cot_type].format(
-                speaker=speaker_label_dict[conv_id][conv_turn], utterance=sentence_dict[conv_id][conv_turn]
+                speaker=speaker_label_dict[conv_id][conv_turn], utterance=sentence_dict[conv_id][conv_turn], emotions=EMOTIONAL_LABEL_TEXTS[dataset]
             )
             content_task_dict[f"{conv_id}_{conv_turn}"] = INPUT_TEMPLATE.format(
                 task_statement=task_statement, conversation=conversation_str, biography="", instruction=instruction
